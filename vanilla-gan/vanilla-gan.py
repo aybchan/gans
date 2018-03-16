@@ -1,19 +1,18 @@
 import tensorflow as tf
 import numpy as np
 
-import datetime
 import time
 import os
 
 from matplotlib import pyplot as plt
 import matplotlib.gridspec as gridspec
-import matplotlib.image as mpimg
+import matplotlib.ticker as tick
 
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets("/tmp/data/", one_hot=False)
 plt.style.use('fivethirtyeight')
 
-def plot(output_dir,epoch,images,step,steps,g_losses,d_losses):
+def plot(output_dir,epoch,images,step,steps,loss):
     # line smoothing for plotting loss
     def savitzky_golay(y, window_size, order, deriv=0, rate=1):
         import numpy as np
@@ -30,36 +29,38 @@ def plot(output_dir,epoch,images,step,steps,g_losses,d_losses):
         lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
         y = np.concatenate((firstvals, y, lastvals))
         return np.convolve( m[::-1], y, mode='valid')
-    xx = np.linspace(0,step,len(g_losses))
+    def k(x,pos):
+      x /= 1000.0
+      return '%.1f%s' % (x, 'K')
+
+    xs = np.linspace(0,step,len(loss[0]))
     fig = plt.figure(figsize=(12,6))
-    fig.suptitle('Epoch %d' % (epoch) , fontsize=20,x=0.53)
+    fig.suptitle('Epoch %d' % (epoch) , fontsize=20,x=0.55)
 
     gs1 = gridspec.GridSpec(8,8)
     images = images.reshape([64,28,28])
     for i,subplot in enumerate(gs1):
         ax = fig.add_subplot(subplot)
-        ax.imshow(images[i])
+        ax.imshow(images[i],cmap=plt.cm.gray)
         ax.axis('off')
         ax.set_axis_off()
     gs1.tight_layout(fig, rect=[0, 0, 0.5,1])
     gs1.update(wspace=0.0, hspace=0.0)
 
     gs2 = gridspec.GridSpec(2,1)
-    ax1 = fig.add_subplot(gs2[0])
-    ax1.plot(xx,g_losses,linewidth=1.5,alpha=0.3,c='#008FD5')
-    ax1.plot(xx,savitzky_golay(g_losses,61,5),c='#008FD5')
-    ax1.set_title('Generator loss',fontsize=12)
-    ax1.set_xlabel('Step',fontsize=10)
-    ax1.set_ylabel('Loss',fontsize=10)
-    ax1.set_xlim([0,steps])
 
-    ax2 = fig.add_subplot(gs2[1])
-    ax2.plot(xx,d_losses,linewidth=1.5,alpha=0.3,c='#FF2700')
-    ax2.plot(xx,savitzky_golay(d_losses,61,5),c='#FF2700')
-    ax2.set_title('Discriminator loss',fontsize=12)
-    ax2.set_xlabel('Step',fontsize=10)
-    ax2.set_ylabel('Loss',fontsize=10)
-    ax2.set_xlim([0,steps])
+    c = ['#008FD5','#FF2700']
+    title = ['Generator loss','Discriminator loss']
+
+    for p in range(2):
+        ax = fig.add_subplot(gs2[p])
+        ax.plot(xs,loss[p], linewidth=1.5,alpha=0.3,c=c[p])
+        ax.plot(xs,savitzky_golay(loss[p],61,5),c=c[p])
+        ax.set_title(title[p],fontsize=12)
+        ax.set_xlabel('Step',fontsize=10)
+        ax.set_ylabel('Loss',fontsize=10)
+        ax.set_xlim([0,steps])
+        ax.xaxis.set_major_formatter(tick.FuncFormatter(k))
 
     gs2.tight_layout(fig, rect=[0.5, 0, 1, 1])
 
@@ -137,7 +138,7 @@ with tf.Session() as sess:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
-    print('Epoch\tDisc. loss\tGen. loss\tTime')
+    print('Epoch\tDisc. loss\tGen. loss\tTime\tClock')
     for epoch in range(epochs):
         start = time.time()
         for batch in range(mnist.train.num_examples//batch_size):
@@ -155,8 +156,9 @@ with tf.Session() as sess:
         end = time.time()
         losses = sess.run([d_loss,g_loss],feed_dict={z: code,x: imgs})
         print('{0}\t{1:.4f}\t\t{2:.4f}\t\t{3:.1f}s'
-                            .format(epoch,losses[0],losses[1],end-start))
+                .format(epoch,losses[0],losses[1],end-start)
+                + time.strftime("%X"))
 
         images = sess.run(g,feed_dict={z: code})
         step   = (epoch + 1) * mnist.train.num_examples
-        plot('outputs/',epoch,images,step,steps,g_losses,d_losses)
+        plot('outputs/',epoch,images,step,steps,[g_losses,d_losses])
