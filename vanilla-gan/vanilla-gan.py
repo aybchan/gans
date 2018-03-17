@@ -155,7 +155,7 @@ with tf.Session() as sess:
         saver.save(sess,save_dir + '/model.ckpt')
         end = time.time()
         losses = sess.run([d_loss,g_loss],feed_dict={z: code,x: imgs})
-        print('{0}\t{1:.4f}\t\t{2:.4f}\t\t{3:.1f}s'
+        print('{0}\t{1:.4f}\t\t{2:.4f}\t\t{3:.1f}s\t'
                 .format(epoch,losses[0],losses[1],end-start)
                 + time.strftime("%X"))
 
